@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #0a0a0f;
+  color: #e8e4df;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a35;
+  border-radius: 3px;
+}
+
+/* Markdown-like styling for answers */
+.answer-content h1, .answer-content h2, .answer-content h3 {
+  font-family: 'Instrument Serif', serif;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+}
+.answer-content p {
+  margin-bottom: 0.8em;
+  line-height: 1.7;
+}
+.answer-content code {
+  font-family: 'JetBrains Mono', monospace;
+  background: #1a1a25;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.answer-content strong {
+  color: #c4a7ff;
+}
+
+/* Pulse animation for loading */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
