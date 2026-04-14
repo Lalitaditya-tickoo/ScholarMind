@@ -1,344 +1,385 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-<img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" />
-<img src="https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
-<img src="https://img.shields.io/badge/Claude_API-Sonnet_4-cc785c?style=for-the-badge&logo=anthropic&logoColor=white" />
-<img src="https://img.shields.io/badge/ChromaDB-Vector_Store-FF6F00?style=for-the-badge" />
-
-<br><br>
-
 # 🧠 ScholarMind
 
-### AI-Powered Research Assistant with Retrieval-Augmented Generation
+### AI-Powered Research Assistant with Quantified RAG Evaluation
 
-*Upload scientific papers. Ask questions in natural language. Get cited answers with page references — zero hallucinations.*
+**Upload papers → Ask questions → Get cited answers → Measure quality**
+
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![Claude API](https://img.shields.io/badge/Claude_API-Sonnet_4-D97757?style=for-the-badge&logo=anthropic&logoColor=white)](https://anthropic.com)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_Store-FF6F61?style=for-the-badge)](https://www.trychroma.com)
 
 <br>
 
-[Features](#-features) · [Architecture](#-architecture) · [Quick Start](#-quick-start) · [How It Works](#-how-it-works) · [Tech Decisions](#-technical-decisions) · [API Reference](#-api-reference) · [Docs](docs/)
-
-<br>
+*Not just another RAG demo — ScholarMind includes a **RAGAS-inspired evaluation pipeline**, **cross-paper synthesis**, and **table extraction** that quantify and differentiate the system from typical retrieval-augmented generation projects.*
 
 ---
 
 </div>
 
-<br>
+## What Makes This Different
 
-## ✨ Features
+| Feature | Typical RAG Project | ScholarMind |
+|---------|-------------------|-------------|
+| **Query answering** | Upload → retrieve → answer | ✅ With inline source citations |
+| **Evaluation** | "It works" | ✅ 4-metric RAGAS pipeline (Faithfulness, Relevance, Precision, Recall) |
+| **Multi-paper analysis** | Query one paper at a time | ✅ Cross-paper synthesis: consensus, contradictions, research gaps |
+| **Table extraction** | Ignores tables entirely | ✅ Structured table parsing with Markdown export |
+| **Summarization** | Generic summary | ✅ Structured: Objective → Methods → Findings → Limitations |
 
-<table>
-<tr>
-<td width="50%">
+---
 
-**📄 Smart PDF Processing**
-- Text extraction with PyMuPDF
-- Figure & table detection
-- OCR fallback for scanned papers
-- Title extraction via font-size heuristic
-
-</td>
-<td width="50%">
-
-**🔍 Semantic Search**
-- Section-aware chunking (Abstract, Methods, Results...)
-- 384-dim embeddings via sentence-transformers
-- Cosine similarity retrieval from ChromaDB
-- Metadata-rich results with relevance scores
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-**🤖 Cited AI Answers**
-- Claude Sonnet generates grounded responses
-- Every claim tagged with `[Paper, Page]`
-- No hallucination — answers only from your papers
-- Cross-paper synthesis and comparison
-
-</td>
-<td width="50%">
-
-**💻 Modern Interface**
-- Drag-and-drop PDF upload
-- Real-time processing status
-- Expandable citation cards
-- Paper selection for targeted search
-
-</td>
-</tr>
-</table>
-
-<br>
-
-## 🏗 Architecture
+## Architecture
 
 ```mermaid
-flowchart TB
-    subgraph Frontend["⚛️ React Frontend"]
-        UI[Upload PDFs · Ask Questions · View Citations]
+graph TB
+    subgraph Frontend ["⚛️ React Frontend"]
+        UI[Chat Interface]
+        PM[Paper Manager]
+        CV[Citation Viewer]
     end
 
-    subgraph Backend["🐍 FastAPI Backend"]
-        direction LR
-        PDF["📄 PDF Processor<br><small>PyMuPDF · OCR · Figures</small>"]
-        RAG["🔍 RAG Engine<br><small>Chunking · Embedding · Retrieval</small>"]
-        LLM["🤖 Claude Client<br><small>Cited Answer Generation</small>"]
+    subgraph API ["🚀 FastAPI Backend"]
+        UP["/papers/upload"]
+        QR["/query"]
+        CP["/query/cross-paper"]
+        SM["/papers/{id}/summarize"]
+        TB["/papers/{id}/tables"]
+        EV["/evaluate"]
     end
 
-    subgraph Storage["💾 Storage Layer"]
-        direction LR
-        VDB["ChromaDB<br><small>Vector Store · Cosine Index</small>"]
-        EMB["all-MiniLM-L6-v2<br><small>384-dim Embeddings · Local</small>"]
+    subgraph Processing ["🔧 Processing Pipeline"]
+        PDF[PDF Processor<br><i>PyMuPDF + OCR</i>]
+        TE[Table Extractor<br><i>Layout Analysis</i>]
+        CH[Chunker<br><i>512 tokens, 64 overlap</i>]
     end
 
-    UI -->|REST API| PDF
-    PDF -->|Extracted Text + Figures| RAG
-    RAG -->|Chunks + Vectors| VDB
-    EMB -.->|Encode| RAG
-    UI -->|User Question| RAG
-    RAG -->|Top-k Chunks| LLM
-    LLM -->|Cited Answer| UI
+    subgraph RAG ["🧠 RAG Engine"]
+        EMB["Embedder<br><i>all-MiniLM-L6-v2</i>"]
+        VS["Vector Store<br><i>ChromaDB (cosine)</i>"]
+        RET[Retriever<br><i>Top-k Semantic Search</i>]
+    end
 
-    style Frontend fill:#1a1a2e,stroke:#7c3aed,color:#e2e8f0
-    style Backend fill:#1a1a2e,stroke:#059669,color:#e2e8f0
-    style Storage fill:#1a1a2e,stroke:#d97706,color:#e2e8f0
+    subgraph LLM ["🤖 Claude API"]
+        ANS[Answer Generator<br><i>Cited responses</i>]
+        SYN[Cross-Paper Synthesizer<br><i>Consensus + Contradictions</i>]
+        SUM[Summarizer<br><i>Structured output</i>]
+        JDG[Evaluation Judge<br><i>4-metric scoring</i>]
+    end
+
+    UI --> QR
+    UI --> CP
+    PM --> UP
+    PM --> SM
+    PM --> TB
+
+    UP --> PDF --> CH --> EMB --> VS
+    UP --> TE
+    QR --> RET --> ANS
+    CP --> RET --> SYN
+    SM --> SUM
+    EV --> RET --> JDG
+
+    RET -.->|"query embedding"| EMB
+    RET -.->|"similarity search"| VS
+
+    style Frontend fill:#1a1a2e,stroke:#e94560,color:#fff
+    style API fill:#16213e,stroke:#0f3460,color:#fff
+    style Processing fill:#1a1a2e,stroke:#533483,color:#fff
+    style RAG fill:#0f3460,stroke:#e94560,color:#fff
+    style LLM fill:#533483,stroke:#e94560,color:#fff
 ```
 
-<br>
+---
 
-## 📋 How It Works
+## RAG Pipeline Deep Dive
 
-```
-┌─────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│ 1.UPLOAD │───▶│ 2.EXTRACT│───▶│ 3.CHUNK  │───▶│ 4.EMBED  │───▶│ 5.STORE  │    │          │
-│   PDF    │    │Text+Figs │    │ Section  │    │ 384-dim  │    │ ChromaDB │    │          │
-└──────────┘    └──────────┘    │  Aware   │    │ Vectors  │    └────┬─────┘    │          │
-                                └──────────┘    └──────────┘         │          │          │
-┌──────────┐    ┌──────────┐    ┌──────────┐                         │          │          │
-│ 8.ANSWER │◀───│7.GENERATE│◀───│6.RETRIEVE│◀────────────────────────┘          │          │
-│  Cited   │    │  Claude  │    │  Top-k   │◀───────────────────────────────────│ 6.QUERY  │
-│ Response │    │  Sonnet  │    │ Semantic │                                    │  User Q  │
-└──────────┘    └──────────┘    └──────────┘                                    └──────────┘
-```
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as FastAPI
+    participant P as PDF Processor
+    participant R as RAG Engine
+    participant V as ChromaDB
+    participant C as Claude API
 
-| Step | Component | What Happens |
-|:----:|-----------|-------------|
-| **1** | Upload | PDF file received by FastAPI server |
-| **2** | Extract | PyMuPDF pulls text per page, detects figures (base64), finds tables. OCR fallback via Tesseract for scanned pages |
-| **3** | Chunk | Section-aware splitter detects academic headers (Abstract, Methods, Results...) and creates 512-word overlapping chunks |
-| **4** | Embed | Each chunk encoded into 384-dim vector using `all-MiniLM-L6-v2` (runs locally, zero API cost) |
-| **5** | Store | Vectors + metadata (paper ID, page number, section, figure refs) indexed in ChromaDB with cosine similarity |
-| **6** | Query + Retrieve | User question is embedded → top-k similar chunks retrieved with relevance scores |
-| **7** | Generate | Retrieved chunks sent to Claude Sonnet with structured prompt enforcing `[Paper, Page]` citation format |
-| **8** | Answer | Cited response returned to frontend with expandable source cards |
+    Note over U,C: 📄 Paper Upload Flow
+    U->>A: POST /papers/upload (PDF)
+    A->>P: Extract text + tables
+    P-->>A: pages[], tables[]
+    A->>R: chunk_paper(text)
+    R->>R: Split into 512-token chunks
+    R->>R: Encode with MiniLM-L6-v2
+    R->>V: Store embeddings + metadata
+    V-->>A: chunk_count
+    A-->>U: {paper_id, title, num_chunks}
 
-<br>
+    Note over U,C: 🔍 Query Flow
+    U->>A: POST /query {question}
+    A->>R: query(question, top_k=5)
+    R->>R: Encode question
+    R->>V: Cosine similarity search
+    V-->>R: top-k chunks + scores
+    R-->>A: RetrievedChunk[]
+    A->>C: answer_query(question, chunks)
+    C-->>A: Cited answer with [Source N]
+    A-->>U: {answer, sources[], latency_ms}
 
-## 🔬 Sample Interaction
-
-```
-📄  Uploaded: underwater_litter_detection.pdf
-    12 pages · 47 chunks · 3 figures extracted
-
-❓  User: What deep learning architectures were compared in this study?
-
-🤖  ScholarMind:
-
-    The study evaluated two instance segmentation architectures for underwater
-    marine litter detection:
-
-    1. Mask R-CNN with a ResNet-101-FPN backbone, using domain-adapted training
-       with AdamW optimizer, differential learning rates, and gradient clipping
-       [Paper: underwater_litter_detection.pdf, Page: 4]
-
-    2. Mask2Former with a Swin Transformer backbone, representing a more recent
-       query-based approach to instance segmentation
-       [Paper: underwater_litter_detection.pdf, Page: 5]
-
-    Both models were evaluated on a custom COCO-format dataset containing ~8,000
-    annotated underwater images across 10 marine litter categories. The Mask R-CNN
-    variant achieved ~62-65% mean Dice coefficient and ~56-59% mean IoU.
-    [Paper: underwater_litter_detection.pdf, Page: 8]
-
-    📎 Sources (3) ▾
+    Note over U,C: 📊 Evaluation Flow
+    U->>A: POST /evaluate {samples[]}
+    loop For each sample
+        A->>R: Retrieve chunks
+        A->>C: Generate answer
+        A->>C: Judge: Faithfulness
+        A->>C: Judge: Relevance
+        A->>C: Judge: Precision
+        A->>C: Judge: Recall
+    end
+    A-->>U: {avg_scores, per_sample_results}
 ```
 
-<br>
+---
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Python | 3.10 – 3.13 | Backend runtime |
-| Node.js | 18+ | Frontend tooling |
-| API Key | [AICredits.in](https://aicredits.in) or [Anthropic](https://console.anthropic.com) | LLM access |
-
-### 1. Clone and setup backend
-
-```bash
-git clone https://github.com/Lalitaditya-tickoo/ScholarMind.git
-cd ScholarMind/backend
-
-python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Configure your API key
-cp .env.example .env
-# Edit .env → ANTHROPIC_API_KEY=sk-live-your-key
-
-python main.py
-# ✅ "ScholarMind backend ready!" (first run downloads ~90MB embedding model)
-```
-
-### 2. Start frontend (new terminal)
-
-```bash
-cd ScholarMind/frontend
-npm install
-npm run dev
-# ✅ http://localhost:5173
-```
-
-### 3. Use it
-
-1. Open `http://localhost:5173` in your browser
-2. Drag-drop research papers (PDF) into the sidebar
-3. Wait for processing (10-30s per paper)
-4. Ask questions → get cited answers
-
-<br>
-
-## ⚖️ Technical Decisions
-
-| Decision | Chose | Over | Rationale |
-|----------|:-----:|------|-----------|
-| **Vector DB** | ChromaDB | Pinecone, Weaviate | Zero config, local, free, persistent. No network latency for a single-user research tool |
-| **Embeddings** | all-MiniLM-L6-v2 | OpenAI ada-002 | Runs locally (₹0 cost), 384-dim sufficient for academic text, top-tier MTEB scores for its size |
-| **PDF Parser** | PyMuPDF | pdfplumber, PyPDF2 | 10x faster extraction, supports images + font metadata, handles multi-column layouts |
-| **Chunking** | Section-aware + overlap | Fixed-size, recursive | Respects paper structure — a Methods chunk won't bleed into Results. 64-word overlap prevents boundary information loss |
-| **LLM** | Claude Sonnet | GPT-4o, local LLMs | Best citation compliance, strong long-context synthesis, ~₹0.15–0.30 per query |
-| **Frontend** | React + Tailwind | Streamlit, Gradio | Portfolio-grade UI with full control. Streamlit/Gradio produce generic interfaces |
-
-> 📖 Deep dive: [docs/technical-decisions.md](docs/technical-decisions.md)
-
-<br>
-
-## 📡 API Reference
+## API Reference
 
 | Method | Endpoint | Description |
-|:------:|----------|-------------|
+|--------|----------|-------------|
 | `POST` | `/papers/upload` | Upload and process a PDF → returns metadata + chunk count |
 | `GET` | `/papers` | List all uploaded papers with stats |
 | `DELETE` | `/papers/{id}` | Remove paper and its vectors from the store |
 | `POST` | `/query` | Ask a question → returns cited answer + sources |
+| `POST` | `/query/cross-paper` | **Cross-paper synthesis** → consensus, contradictions, gaps |
 | `POST` | `/papers/{id}/summarize` | Generate structured summary (Objective, Methods, Findings) |
+| `GET` | `/papers/{id}/tables` | **Extract tables** from a paper's PDF |
+| `POST` | `/evaluate` | **Run RAGAS-style evaluation** on the RAG pipeline |
 | `GET` | `/health` | System health + vector store statistics |
 
 <details>
-<summary><b>Example: Query Request</b></summary>
+<summary><b>📨 Example: Query Request & Response</b></summary>
 
-```json
-POST /query
-{
-  "question": "What methodology did they use for data collection?",
-  "paper_ids": null,
-  "top_k": 8
-}
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What preprocessing techniques improve underwater image quality?",
+    "top_k": 5
+  }'
 ```
 
-**Response:**
 ```json
 {
-  "answer": "The study employed a systematic...",
-  "citations": [
+  "answer": "Several preprocessing techniques are used for underwater image enhancement. According to [Source 1], white balance correction using the gray world algorithm addresses color cast from selective light absorption. [Source 2] reports that CLAHE improves local contrast...",
+  "sources": [
     {
-      "paper_id": "a1b2c3",
-      "paper_name": "methods_paper.pdf",
-      "page_number": 4,
-      "chunk_text": "Data was collected using...",
-      "relevance_score": 0.8923
+      "paper_id": "a1b2c3d4",
+      "paper_title": "Underwater Image Enhancement: A Survey",
+      "chunk_index": 12,
+      "page_number": 5,
+      "relevance_score": 0.8934
     }
   ],
-  "figures_used": []
+  "model": "claude-sonnet-4-20250514",
+  "query_time_ms": 1847.3
 }
 ```
-
 </details>
 
-<br>
+<details>
+<summary><b>🔀 Example: Cross-Paper Synthesis</b></summary>
 
-## 📁 Project Structure
+```bash
+curl -X POST http://localhost:8000/query/cross-paper \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "How effective is transfer learning for underwater object detection?",
+    "top_k_per_paper": 3
+  }'
+```
+
+```json
+{
+  "consensus": "All papers agree that ImageNet-pretrained backbones significantly improve convergence speed and final accuracy on underwater datasets.",
+  "contradictions": [
+    {
+      "topic": "Optimal backbone architecture",
+      "paper_a": "Underwater Detection with CNNs",
+      "position_a": "ResNet-101 provides the best accuracy-speed tradeoff",
+      "paper_b": "Transformer-based Marine Detection",
+      "position_b": "Swin Transformer outperforms all CNN backbones"
+    }
+  ],
+  "gaps": [
+    "No paper evaluates transfer learning from underwater-specific pretrained models",
+    "Impact of domain gap between terrestrial and underwater imagery not quantified"
+  ],
+  "synthesis_summary": "While papers agree on the value of pretraining, they diverge on architecture choice, reflecting the broader CNN vs Transformer debate in the field."
+}
+```
+</details>
+
+---
+
+## Evaluation Pipeline
+
+ScholarMind doesn't just retrieve — it **measures how well it retrieves**. See [`EVALUATION.md`](./EVALUATION.md) for full methodology.
+
+```mermaid
+graph LR
+    Q[Question + Ground Truth] --> R[1. Retrieve]
+    R --> G[2. Generate Answer]
+    G --> F{LLM Judge}
+    F --> M1["Faithfulness<br><i>Hallucination detection</i>"]
+    F --> M2["Answer Relevance<br><i>On-topic scoring</i>"]
+    F --> M3["Context Precision<br><i>Retriever signal quality</i>"]
+    F --> M4["Context Recall<br><i>Retriever coverage</i>"]
+    M1 --> AGG[Aggregate Report]
+    M2 --> AGG
+    M3 --> AGG
+    M4 --> AGG
+
+    style F fill:#533483,stroke:#e94560,color:#fff
+    style AGG fill:#0f3460,stroke:#e94560,color:#fff
+```
+
+### Metric Definitions
+
+| Metric | Formula | What It Catches |
+|--------|---------|----------------|
+| **Faithfulness** | `supported_claims / total_claims` | Hallucinated facts not in sources |
+| **Answer Relevance** | `semantic_similarity(answer, question)` | Off-topic or tangential responses |
+| **Context Precision** | `relevant_chunks / retrieved_chunks` | Noisy retrieval (pulling irrelevant text) |
+| **Context Recall** | `covered_facts / ground_truth_facts` | Missing information (incomplete retrieval) |
+
+### Run Evaluation
+
+```bash
+cd eval
+python run_eval.py \
+  --dataset test_questions.json \
+  --api http://localhost:8000 \
+  --markdown RESULTS.md
+```
+
+---
+
+## Project Structure
 
 ```
 ScholarMind/
 ├── backend/
-│   ├── main.py              # FastAPI server — upload, query, delete, summarize
-│   ├── pdf_processor.py     # PDF extraction: text, figures, tables, OCR
-│   ├── rag_engine.py        # Chunking, embedding, ChromaDB, retrieval
-│   ├── claude_client.py     # Claude API via OpenAI-compatible gateway
-│   ├── models.py            # Pydantic schemas
+│   ├── main.py                # FastAPI server — all endpoints
+│   ├── pdf_processor.py       # PDF extraction: text, OCR fallback
+│   ├── rag_engine.py          # Chunking, embedding, ChromaDB, retrieval
+│   ├── claude_client.py       # Claude API — answer generation + summarization
+│   ├── cross_paper.py         # Cross-paper synthesis engine
+│   ├── table_extractor.py     # Table detection + structured extraction
+│   ├── evaluator.py           # RAGAS-inspired 4-metric evaluation pipeline
+│   ├── models.py              # Pydantic request/response schemas
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx          # Main app: upload, chat, citations, paper list
-│   │   ├── main.jsx         # React entry
-│   │   └── index.css        # Tailwind + custom styles
-│   ├── index.html
-│   └── package.json
-├── docs/
-│   ├── how-rag-works.md     # Conceptual RAG explainer
-│   └── technical-decisions.md
+│   │   ├── App.jsx            # Main app: upload, chat, citations
+│   │   └── main.jsx           # React entry point
+│   ├── package.json
+│   └── vite.config.js
+├── eval/
+│   ├── run_eval.py            # Standalone evaluation runner
+│   └── test_questions.json    # Test dataset with ground truth answers
+├── EVALUATION.md              # Evaluation methodology documentation
 └── README.md
 ```
 
-<br>
+---
 
-## ⚠️ Limitations & Roadmap
+## Quick Start
 
-| Current Limitation | Planned Improvement |
-|--------------------|-------------------|
-| Figures extracted but not sent to LLM for visual analysis | Integrate direct Anthropic API for Claude Vision support |
-| Tables detected but not structurally parsed | Add Camelot/tabula-py for row-column extraction |
-| LaTeX equations extracted as raw text | Integrate LaTeX-to-text converter |
-| Single-user local deployment | Dockerize + deploy with auth for multi-user access |
-| English-only section detection | Multilingual header patterns |
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- [Anthropic API Key](https://console.anthropic.com/)
 
-<br>
+### Backend
 
-## 📚 Learn More
+```bash
+cd backend
+pip install -r requirements.txt
 
-- [How RAG Works — Conceptual Guide](docs/how-rag-works.md) — Full explanation of the retrieval-augmented generation pipeline
-- [Technical Decisions](docs/technical-decisions.md) — Engineering trade-offs and component selection rationale
+# Create .env
+echo ANTHROPIC_API_KEY=sk-ant-your-key-here > .env
 
-<br>
+# Start
+uvicorn main:app --port 8000 --reload
+```
 
-## 🛠 Built With
+### Frontend
 
-<p>
-<img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" />
-<img src="https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black" />
-<img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" />
-<img src="https://img.shields.io/badge/ChromaDB-FF6F00?style=flat-square" />
-<img src="https://img.shields.io/badge/PyMuPDF-333333?style=flat-square" />
-<img src="https://img.shields.io/badge/Sentence_Transformers-FFD43B?style=flat-square" />
-<img src="https://img.shields.io/badge/Claude_API-cc785c?style=flat-square" />
-<img src="https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white" />
-</p>
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-<br>
+### Upload & Query
+
+```bash
+# Upload
+curl -X POST -F "file=@paper.pdf" http://localhost:8000/papers/upload
+
+# Query
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What methods does this paper propose?"}'
+
+# Cross-paper (needs 2+ papers)
+curl -X POST http://localhost:8000/query/cross-paper \
+  -H "Content-Type: application/json" \
+  -d '{"question": "How do these papers compare?"}'
+```
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **API** | FastAPI | Async REST API with auto-generated docs |
+| **Frontend** | React 18 + Vite | Chat interface with citation rendering |
+| **Embedding** | sentence-transformers (`all-MiniLM-L6-v2`) | 384-dim vector encoding |
+| **Vector Store** | ChromaDB | Persistent cosine similarity search |
+| **LLM** | Claude Sonnet 4 (Anthropic API) | Generation, synthesis, evaluation |
+| **PDF** | PyMuPDF | Text extraction, OCR, layout analysis |
+
+---
+
+## Design Decisions
+
+**Why ChromaDB over Pinecone/Weaviate?**
+Zero infrastructure — runs locally with file-based persistence. No API keys, no cloud dependency.
+
+**Why custom evaluation over RAGAS library?**
+Full control over judge prompts and scoring logic. No opaque dependencies. Each metric is a separate, debuggable LLM call.
+
+**Why sentence-transformers over OpenAI embeddings?**
+Runs locally (no API cost per embedding), reproducible, and `all-MiniLM-L6-v2` achieves strong STS benchmark performance while being fast enough for real-time.
+
+**Why cross-paper synthesis?**
+Real research isn't querying one paper — it's understanding how findings relate across literature. Finding contradictions between papers is genuinely hard and is what researchers actually need.
+
+---
+
+## License
+
+MIT
 
 ---
 
 <div align="center">
 
-**Built by [Lalitaditya](https://github.com/Lalitaditya-tickoo)** · CS Undergrad (AI/ML) · SRM University
+**Built by [Lalitaditya Tickoo](https://github.com/Lalitaditya-tickoo)**
 
-*Research: Underwater marine litter instance segmentation · Interests: Computer vision, deep learning, RAG systems*
+*ScholarMind — Because research should be about understanding, not searching.*
 
 </div>
