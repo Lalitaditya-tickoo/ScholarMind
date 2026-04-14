@@ -1,0 +1,55 @@
+{
+  "description": "ScholarMind evaluation dataset - replace with questions matching YOUR uploaded papers",
+  "samples": [
+    {
+      "question": "What preprocessing techniques are commonly used for underwater image enhancement?",
+      "ground_truth": "Common techniques include white balance correction (gray world algorithm), contrast limited adaptive histogram equalization (CLAHE), gamma correction, dehazing algorithms, and bilateral denoising. These address color cast, low contrast, and light scattering artifacts typical in underwater imagery.",
+      "paper_ids": []
+    },
+    {
+      "question": "How does Mask R-CNN differ from Mask2Former for instance segmentation?",
+      "ground_truth": "Mask R-CNN uses a two-stage approach with region proposal network followed by classification, bounding box regression, and mask prediction. Mask2Former uses a transformer-based architecture with masked attention and is query-based, achieving better performance without explicit region proposals.",
+      "paper_ids": []
+    },
+    {
+      "question": "What evaluation metrics are used for instance segmentation performance?",
+      "ground_truth": "Key metrics include mean Average Precision (mAP) at various IoU thresholds, Dice coefficient, Intersection over Union (IoU), and pixel accuracy. mAP at IoU=0.50 (AP50) and IoU=0.75 (AP75) are standard COCO benchmarks.",
+      "paper_ids": []
+    },
+    {
+      "question": "What are the main challenges in underwater object detection?",
+      "ground_truth": "Key challenges include poor visibility due to light absorption and scattering, color distortion, varying turbidity levels, motion blur from water currents, camouflaged objects blending with the seafloor, and limited annotated training datasets.",
+      "paper_ids": []
+    },
+    {
+      "question": "What data augmentation strategies are effective for underwater imagery?",
+      "ground_truth": "Effective strategies include random flips, rotation, color jitter simulating underwater color shifts, random cropping, mosaic augmentation, simulated turbidity variation, and domain-specific augmentations like synthetic underwater haze.",
+      "paper_ids": []
+    },
+    {
+      "question": "How does transfer learning help in underwater object detection?",
+      "ground_truth": "Transfer learning uses models pretrained on large datasets like ImageNet or COCO to initialize weights, helping overcome limited underwater dataset sizes. Fine-tuning on domain-specific data allows adapting learned features while requiring fewer training samples.",
+      "paper_ids": []
+    },
+    {
+      "question": "What loss functions are commonly used for training instance segmentation models?",
+      "ground_truth": "Common loss functions include cross-entropy loss for mask prediction, smooth L1 loss for bounding box regression, focal loss for class imbalance, and dice loss for optimizing segmentation overlap.",
+      "paper_ids": []
+    },
+    {
+      "question": "What is the role of feature pyramid networks in object detection?",
+      "ground_truth": "FPN builds a multi-scale feature pyramid from single-scale input by combining top-down pathways with lateral connections, enabling detection at multiple scales and improving performance on both small and large objects.",
+      "paper_ids": []
+    },
+    {
+      "question": "How does the COCO annotation format work for instance segmentation?",
+      "ground_truth": "COCO format uses JSON files containing image metadata, category definitions, and annotations with segmentation masks as polygon coordinates or RLE encoding, bounding boxes, category IDs, and area measurements.",
+      "paper_ids": []
+    },
+    {
+      "question": "What are the differences between semantic and instance segmentation?",
+      "ground_truth": "Semantic segmentation assigns class labels to pixels without distinguishing instances. Instance segmentation classifies pixels AND separates individual objects, providing per-object masks, which is more challenging.",
+      "paper_ids": []
+    }
+  ]
+}

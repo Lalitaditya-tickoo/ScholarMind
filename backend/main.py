@@ -37,6 +37,12 @@ rag_engine: RAGEngine = None
 claude: ClaudeClient = None
 papers_db: dict[str, PaperMetadata] = {}
 
+# -- Upgrade: new components --
+cross_paper_synth = None
+table_extractor_inst = None
+evaluator = None
+
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -53,6 +59,12 @@ async def lifespan(app: FastAPI):
     claude = ClaudeClient(api_key=api_key)
 
     logger.info("ScholarMind backend ready!")
+        # -- Upgrade: initialize new components --
+    global cross_paper_synth, table_extractor_inst, evaluator
+    cross_paper_synth = CrossPaperSynthesizer()
+    table_extractor_inst = TableExtractor()
+    evaluator = ScholarMindEvaluator()
+
     yield
     logger.info("Shutting down ScholarMind...")
 
@@ -225,6 +237,139 @@ async def summarize_paper(paper_id: str):
     return {"paper_id": paper_id, "summary": summary}
 
 
+
+
+
+# ===============================================================
+# Cross-Paper Synthesis
+# ===============================================================
+
+@app.post("/query/cross-paper", response_model=CrossPaperResponse)
+async def cross_paper_query(req: CrossPaperQueryRequest):
+    """Query across multiple papers - find consensus, contradictions, and gaps."""
+    target_papers = req.paper_ids if req.paper_ids else list(papers_db.keys())
+
+    if len(target_papers) < 2:
+        raise HTTPException(400, f"Cross-paper synthesis requires at least 2 papers. Have {len(target_papers)}.")
+
+    paper_chunks = {}
+    for pid in target_papers:
+        if pid not in papers_db:
+            continue
+        chunks = rag_engine.query(question=req.question, top_k=req.top_k_per_paper, paper_id=pid)
+        if chunks:
+            paper_chunks[pid] = [
+                {"paper_title": c.paper_title, "text": c.text, "page_number": c.page_number}
+                for c in chunks
+            ]
+
+    if len(paper_chunks) < 2:
+        raise HTTPException(422, "Could not retrieve relevant content from at least 2 papers.")
+
+    result = await cross_paper_synth.synthesize(req.question, paper_chunks)
+
+    positions = [
+        PaperPositionResponse(
+            paper_id=p.paper_id, paper_title=p.paper_title,
+            position=p.position, evidence=p.evidence, page_numbers=p.page_numbers,
+        ) for p in result.positions
+    ]
+    contradictions = [ContradictionResponse(**c) for c in result.contradictions]
+
+    return CrossPaperResponse(
+        query=result.query, consensus=result.consensus,
+        contradictions=contradictions, gaps=result.gaps,
+        positions=positions, paper_count=result.paper_count,
+        synthesis_summary=result.synthesis_summary,
+    )
+
+
+# ===============================================================
+# Table Extraction
+# ===============================================================
+
+@app.get("/papers/{paper_id}/tables", response_model=PaperTablesResponse)
+async def extract_tables(paper_id: str):
+    """Extract all tables from a paper PDF."""
+    if paper_id not in papers_db:
+        raise HTTPException(404, f"Paper '{paper_id}' not found")
+
+    meta = papers_db[paper_id]
+    pdf_path = UPLOAD_DIR / f"{paper_id}_{meta['filename']}"
+
+    if not pdf_path.exists():
+        raise HTTPException(404, "PDF file not found on disk")
+
+    tables = table_extractor_inst.extract_tables(str(pdf_path))
+    table_responses = [TableResponse(**t.to_dict()) for t in tables]
+
+    return PaperTablesResponse(
+        paper_id=paper_id, title=meta["title"],
+        tables=table_responses, total_tables=len(tables),
+    )
+
+
+# ===============================================================
+# RAG Evaluation Pipeline
+# ===============================================================
+
+@app.post("/evaluate", response_model=EvalReportResponse)
+async def run_evaluation(req: EvalRequest):
+    """Run RAGAS-style evaluation on the RAG pipeline."""
+    import time as time_mod
+    results_list = []
+
+    for sample in req.samples:
+        start = time_mod.time()
+        paper_id = sample.paper_ids[0] if sample.paper_ids else None
+        chunks = rag_engine.query(question=sample.question, top_k=5, paper_id=paper_id)
+        context_texts = [c.text for c in chunks]
+
+        context_dicts = [
+            {"paper_title": c.paper_title, "page_number": c.page_number, "text": c.text}
+            for c in chunks
+        ]
+        generated_answer = await claude_client.answer_query(sample.question, context_dicts)
+        elapsed = (time_mod.time() - start) * 1000
+
+        eval_result = await evaluator.evaluate_sample(
+            question=sample.question, generated_answer=generated_answer,
+            ground_truth=sample.ground_truth, context_chunks=context_texts,
+            latency_ms=elapsed,
+        )
+        results_list.append(eval_result)
+
+    report = evaluator.aggregate_results(results_list)
+
+    return EvalReportResponse(
+        num_samples=report.num_samples,
+        avg_faithfulness=round(report.avg_faithfulness, 4),
+        avg_answer_relevance=round(report.avg_answer_relevance, 4),
+        avg_context_precision=round(report.avg_context_precision, 4),
+        avg_context_recall=round(report.avg_context_recall, 4),
+        avg_latency_ms=round(report.avg_latency_ms, 1),
+        results=[
+            EvalResultResponse(
+                question=r.question, generated_answer=r.generated_answer,
+                ground_truth=r.ground_truth, faithfulness=r.faithfulness,
+                answer_relevance=r.answer_relevance, context_precision=r.context_precision,
+                context_recall=r.context_recall, latency_ms=r.latency_ms,
+                num_sources=r.num_sources,
+            ) for r in report.results
+        ],
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
+
+# -- Upgrade imports --
+from cross_paper import CrossPaperSynthesizer
+from table_extractor import TableExtractor
+from evaluator import ScholarMindEvaluator
+from models import (
+    CrossPaperQueryRequest, CrossPaperResponse, PaperPositionResponse, ContradictionResponse,
+    PaperTablesResponse, TableResponse,
+    EvalRequest, EvalReportResponse, EvalResultResponse,
+)
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
